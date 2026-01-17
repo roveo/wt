@@ -151,7 +151,6 @@ func runAddWithBranchFromRepo(repoPath, branch string) error {
 
 	fmt.Fprintf(os.Stderr, "Worktree created successfully.\n")
 
-	// Output cd command
-	fmt.Printf("cd %q\n", targetPath)
+	outputWorktreeSwitch(targetPath, repoPath)
 	return nil
 }

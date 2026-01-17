@@ -6,17 +6,17 @@ import "fmt"
 func BashInit() string {
 	return `# wt shell integration for bash
 wt() {
-    local result exit_code cd_cmd
+    local result exit_code first_line
     result="$(command wt "$@")"
     exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
         [[ -n "$result" ]] && echo "$result" >&2
         return $exit_code
     fi
-    # Extract cd command (handles any escape sequences that might be present)
-    cd_cmd=$(echo "$result" | sed -n 's/.*\(cd "[^"]*"\).*/\1/p' | tail -1)
-    if [[ -n "$cd_cmd" ]]; then
-        eval "$cd_cmd"
+    # Check if first line is a cd command
+    first_line="${result%%$'\n'*}"
+    if [[ "$first_line" == cd\ * ]]; then
+        eval "$result"
     elif [[ -n "$result" ]]; then
         echo "$result"
     fi
@@ -28,17 +28,17 @@ wt() {
 func ZshInit() string {
 	return `# wt shell integration for zsh
 wt() {
-    local result exit_code cd_cmd
+    local result exit_code first_line
     result="$(command wt "$@")"
     exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
         [[ -n "$result" ]] && echo "$result" >&2
         return $exit_code
     fi
-    # Extract cd command (handles any escape sequences that might be present)
-    cd_cmd=$(echo "$result" | sed -n 's/.*\(cd "[^"]*"\).*/\1/p' | tail -1)
-    if [[ -n "$cd_cmd" ]]; then
-        eval "$cd_cmd"
+    # Check if first line is a cd command
+    first_line="${result%%$'\n'*}"
+    if [[ "$first_line" == cd\ * ]]; then
+        eval "$result"
     elif [[ -n "$result" ]]; then
         echo "$result"
     fi
@@ -56,10 +56,12 @@ function wt
         echo $result >&2
         return $exit_code
     end
-    # Get the cd command line
-    set -l cd_cmd (echo "$result" | grep -E '^cd ' | tail -1)
-    if test -n "$cd_cmd"
-        eval $cd_cmd
+    # Check if first line is a cd command
+    set -l first_line $result[1]
+    if string match -q 'cd *' "$first_line"
+        eval (string join "; " $result)
+    else if test -n "$result"
+        echo $result
     end
 end
 `

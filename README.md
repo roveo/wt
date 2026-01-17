@@ -79,6 +79,39 @@ Worktrees are created at `../{repo}.worktrees/{branch}`:
     fix-bug-123/            # wt add fix/bug-123
 ```
 
+## Configuration
+
+### Global config
+
+`~/.config/wt/config.toml`:
+
+```toml
+# Default worktree directory pattern (supports {repo_name} placeholder)
+worktrees_dir = "../{repo_name}.worktrees"
+
+[tmux]
+# Create new tmux window instead of cd (when inside tmux)
+enabled = false
+```
+
+### Per-project config
+
+`.wt.toml` in your repo root:
+
+```toml
+# Override worktree location for this project
+worktrees_dir = "../myproject.worktrees"
+
+# Command to run after cd-ing into a worktree (e.g. open editor)
+on_enter = "nvim"
+
+# Setup command(s) to run after creating a new worktree
+setup = "npm install"
+
+# Or multiple commands
+setup = ["npm install", "npm run build"]
+```
+
 ## License
 
 MIT

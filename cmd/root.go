@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/roveo/wt/internal/config"
 	"github.com/roveo/wt/internal/db"
 	"github.com/roveo/wt/internal/git"
 	"github.com/roveo/wt/internal/ui"
@@ -100,8 +101,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 			if result.Worktree == nil {
 				return nil
 			}
-			// Output cd command for shell wrapper
-			fmt.Printf("cd %q\n", result.Worktree.Path)
+			outputWorktreeSwitch(result.Worktree.Path, result.Worktree.RepoPath)
 			return nil
 		case ui.ActionAdd:
 			// Switch to add workflow - create worktree from the selected repo
@@ -252,4 +252,13 @@ func syncWorktrees(database *sql.DB, repo *db.Repo) error {
 	}
 
 	return nil
+}
+
+// outputWorktreeSwitch outputs the cd command and on_enter command for switching to a worktree
+func outputWorktreeSwitch(worktreePath, repoPath string) {
+	fmt.Printf("cd %q\n", worktreePath)
+	projectCfg, _ := config.LoadProject(repoPath)
+	if projectCfg.OnEnter != "" {
+		fmt.Println(projectCfg.OnEnter)
+	}
 }

@@ -2,11 +2,19 @@ package db
 
 import (
 	"database/sql"
+	"embed"
+	"errors"
 	"os"
 	"path/filepath"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 var defaultDB *sql.DB
 
@@ -32,7 +40,7 @@ func OpenAt(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if err := migrate(db); err != nil {
+	if err := runMigrations(db); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -73,32 +81,25 @@ func Close() error {
 	return nil
 }
 
-func migrate(db *sql.DB) error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS repos (
-		id INTEGER PRIMARY KEY,
-		path TEXT UNIQUE NOT NULL,
-		name TEXT NOT NULL,
-		worktrees_dir TEXT NOT NULL,
-		last_synced_at DATETIME,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		deleted_at DATETIME
-	);
+func runMigrations(db *sql.DB) error {
+	sourceDriver, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return err
+	}
 
-	CREATE TABLE IF NOT EXISTS worktrees (
-		id INTEGER PRIMARY KEY,
-		repo_id INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
-		path TEXT UNIQUE NOT NULL,
-		branch TEXT NOT NULL,
-		is_main BOOLEAN DEFAULT FALSE,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		deleted_at DATETIME
-	);
+	dbDriver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	if err != nil {
+		return err
+	}
 
-	CREATE INDEX IF NOT EXISTS idx_worktrees_repo_id ON worktrees(repo_id);
-	CREATE INDEX IF NOT EXISTS idx_worktrees_deleted_at ON worktrees(deleted_at);
-	CREATE INDEX IF NOT EXISTS idx_repos_deleted_at ON repos(deleted_at);
-	`
-	_, err := db.Exec(schema)
-	return err
+	m, err := migrate.NewWithInstance("iofs", sourceDriver, "sqlite3", dbDriver)
+	if err != nil {
+		return err
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return err
+	}
+
+	return nil
 }

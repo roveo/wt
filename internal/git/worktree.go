@@ -2,6 +2,7 @@ package git
 
 import (
 	"bufio"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -84,15 +85,22 @@ func AddWorktree(repoPath, branch, targetPath string) error {
 	// First, try to create from an existing branch
 	cmd := exec.Command("git", "worktree", "add", targetPath, branch)
 	cmd.Dir = repoPath
-	if err := cmd.Run(); err != nil {
+	if _, err := cmd.CombinedOutput(); err != nil {
 		// If that fails, try creating a new branch from the remote
 		cmd = exec.Command("git", "worktree", "add", "-b", branch, targetPath, "origin/"+branch)
 		cmd.Dir = repoPath
-		if err := cmd.Run(); err != nil {
+		if _, err := cmd.CombinedOutput(); err != nil {
 			// Last resort: create new branch from current HEAD
 			cmd = exec.Command("git", "worktree", "add", "-b", branch, targetPath)
 			cmd.Dir = repoPath
-			return cmd.Run()
+			if output, err := cmd.CombinedOutput(); err != nil {
+				// Return the last error with git's message
+				errMsg := strings.TrimSpace(string(output))
+				if errMsg != "" {
+					return fmt.Errorf("%s", errMsg)
+				}
+				return err
+			}
 		}
 	}
 	return nil

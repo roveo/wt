@@ -8,6 +8,7 @@ import (
 	"github.com/roveo/wt/internal/config"
 	"github.com/roveo/wt/internal/db"
 	"github.com/roveo/wt/internal/git"
+	"github.com/roveo/wt/internal/tmux"
 	"github.com/roveo/wt/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -101,7 +102,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 			if result.Worktree == nil {
 				return nil
 			}
-			outputWorktreeSwitch(result.Worktree.Path, result.Worktree.RepoPath)
+			outputWorktreeSwitch(result.Worktree)
 			return nil
 		case ui.ActionAdd:
 			// Switch to add workflow - create worktree from the selected repo
@@ -254,11 +255,82 @@ func syncWorktrees(database *sql.DB, repo *db.Repo) error {
 	return nil
 }
 
-// outputWorktreeSwitch outputs the cd command and on_enter command for switching to a worktree
-func outputWorktreeSwitch(worktreePath, repoPath string) {
-	fmt.Printf("cd %q\n", worktreePath)
-	projectCfg, _ := config.LoadProject(repoPath)
-	if projectCfg.OnEnter != "" {
-		fmt.Println(projectCfg.OnEnter)
+// outputWorktreeSwitch handles switching to a worktree, either via cd or tmux
+func outputWorktreeSwitch(wt *db.Worktree) {
+	globalCfg, _ := config.Load()
+	projectCfg, _ := config.LoadProject(wt.RepoPath)
+	onEnter := projectCfg.OnEnter
+
+	// If tmux mode is disabled, just output cd + on_enter
+	if globalCfg.Tmux.Mode != "window" {
+		outputCdCommands(wt.Path, onEnter)
+		return
+	}
+
+	windowName := fmt.Sprintf("%s:%s", wt.RepoName, wt.Branch)
+	session := globalCfg.Tmux.Session
+
+	// Handle dedicated session mode
+	if session != "" {
+		// Ensure session exists
+		if !tmux.SessionExists(session) {
+			if err := tmux.CreateSession(session); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to create tmux session: %v\n", err)
+				outputCdCommands(wt.Path, onEnter)
+				return
+			}
+		}
+
+		if !tmux.InTmux() {
+			// Not in tmux - create window in session, output attach command
+			if !tmux.WindowExists(session, windowName) {
+				if err := tmux.CreateWindow(session, windowName, wt.Path, onEnter); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to create tmux window: %v\n", err)
+					outputCdCommands(wt.Path, onEnter)
+					return
+				}
+			} else {
+				// Window exists, just switch to it
+				tmux.SwitchToWindow(session, windowName)
+			}
+			fmt.Printf("tmux attach -t %s\n", session)
+			return
+		}
+
+		// In tmux - switch to session if needed
+		if tmux.CurrentSession() != session {
+			if err := tmux.SwitchClient(session); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to switch tmux session: %v\n", err)
+			}
+		}
+	} else if !tmux.InTmux() {
+		// No dedicated session and not in tmux - just cd
+		outputCdCommands(wt.Path, onEnter)
+		return
+	}
+
+	// Now in tmux (either current session or switched to dedicated session)
+	targetSession := session
+	if targetSession == "" {
+		targetSession = tmux.CurrentSession()
+	}
+
+	if tmux.WindowExists(targetSession, windowName) {
+		if err := tmux.SwitchToWindow(targetSession, windowName); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to switch tmux window: %v\n", err)
+		}
+	} else {
+		if err := tmux.CreateWindow(targetSession, windowName, wt.Path, onEnter); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to create tmux window: %v\n", err)
+		}
+	}
+	// No stdout output - tmux handled everything
+}
+
+// outputCdCommands outputs cd and on_enter commands for shell evaluation
+func outputCdCommands(path, onEnter string) {
+	fmt.Printf("cd %q\n", path)
+	if onEnter != "" {
+		fmt.Println(onEnter)
 	}
 }

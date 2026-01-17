@@ -90,8 +90,31 @@ Worktrees are created at `../{repo}.worktrees/{branch}`:
 worktrees_dir = "../{repo_name}.worktrees"
 
 [tmux]
-# Create new tmux window instead of cd (when inside tmux)
-enabled = false
+# "disabled" - just cd (default)
+# "window" - create/switch to a tmux window per worktree
+mode = "disabled"
+
+# Optional: dedicated tmux session for all worktrees
+# If set, wt will always use/create this session
+# If not in tmux, outputs "tmux attach -t <session>" for shell to eval
+session = ""
+```
+
+#### tmux integration
+
+When `mode = "window"`:
+- **In tmux**: Creates a new window named `{repo}:{branch}` or switches to it if it already exists
+- **Not in tmux**: Falls back to regular cd behavior
+
+When `session` is set (e.g., `session = "wt"`):
+- **In tmux**: Switches to the dedicated session, then creates/switches window
+- **Not in tmux**: Creates the session if needed, creates the window, outputs `tmux attach -t wt`
+
+Example for a dedicated worktree session:
+```toml
+[tmux]
+mode = "window"
+session = "wt"
 ```
 
 ### Per-project config

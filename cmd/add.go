@@ -161,7 +161,14 @@ func runAddWithBranchFromRepo(repoPath, branch string) error {
 		}
 	}
 
-	outputWorktreeSwitch(targetPath, repoPath)
+	// Create worktree struct for outputWorktreeSwitch
+	wt := &db.Worktree{
+		Path:     targetPath,
+		Branch:   branch,
+		RepoPath: repoPath,
+		RepoName: repo.Name,
+	}
+	outputWorktreeSwitch(wt)
 	return nil
 }
 

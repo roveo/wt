@@ -18,9 +18,15 @@ type Config struct {
 
 // TmuxConfig holds tmux-related settings
 type TmuxConfig struct {
-	// Enabled controls whether to create a new tmux window instead of cd.
-	// Only takes effect when running inside a tmux session.
-	Enabled bool `toml:"enabled"`
+	// Mode controls tmux integration behavior.
+	// "disabled" - no tmux integration, just cd (default)
+	// "window" - create/switch to a tmux window for the worktree
+	Mode string `toml:"mode"`
+
+	// Session is the tmux session name to use.
+	// Empty means use current session (if in tmux) or no tmux (if not in tmux).
+	// If set, wt will always use/create this dedicated session.
+	Session string `toml:"session"`
 }
 
 // DefaultConfig returns a Config with sensible defaults
@@ -28,7 +34,8 @@ func DefaultConfig() Config {
 	return Config{
 		WorktreesDir: "../{repo_name}.worktrees",
 		Tmux: TmuxConfig{
-			Enabled: false,
+			Mode:    "disabled",
+			Session: "",
 		},
 	}
 }

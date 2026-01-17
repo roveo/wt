@@ -3,9 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/roveo/wt/internal/config"
 	"github.com/roveo/wt/internal/db"
 	"github.com/roveo/wt/internal/git"
 	"github.com/roveo/wt/internal/ui"
@@ -151,6 +153,29 @@ func runAddWithBranchFromRepo(repoPath, branch string) error {
 
 	fmt.Fprintf(os.Stderr, "Worktree created successfully.\n")
 
+	// Run setup commands if configured
+	projectCfg, _ := config.LoadProject(repoPath)
+	if len(projectCfg.Setup) > 0 {
+		if err := runSetupCommands(targetPath, projectCfg.Setup); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: setup failed: %v\n", err)
+		}
+	}
+
 	outputWorktreeSwitch(targetPath, repoPath)
+	return nil
+}
+
+// runSetupCommands runs the setup commands in the given directory
+func runSetupCommands(dir string, commands []string) error {
+	for _, cmdStr := range commands {
+		fmt.Fprintf(os.Stderr, "Running: %s\n", cmdStr)
+		cmd := exec.Command("sh", "-c", cmdStr)
+		cmd.Dir = dir
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("command %q failed: %w", cmdStr, err)
+		}
+	}
 	return nil
 }

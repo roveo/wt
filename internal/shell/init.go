@@ -13,9 +13,9 @@ wt() {
         [[ -n "$result" ]] && echo "$result" >&2
         return $exit_code
     fi
-    # Check if first line is a cd command
+    # Check if first line is a cd or tmux attach command
     first_line="${result%%$'\n'*}"
-    if [[ "$first_line" == cd\ * ]]; then
+    if [[ "$first_line" == cd\ * || "$first_line" == "tmux attach"* ]]; then
         eval "$result"
     elif [[ -n "$result" ]]; then
         echo "$result"
@@ -35,9 +35,9 @@ wt() {
         [[ -n "$result" ]] && echo "$result" >&2
         return $exit_code
     fi
-    # Check if first line is a cd command
+    # Check if first line is a cd or tmux attach command
     first_line="${result%%$'\n'*}"
-    if [[ "$first_line" == cd\ * ]]; then
+    if [[ "$first_line" == cd\ * || "$first_line" == "tmux attach"* ]]; then
         eval "$result"
     elif [[ -n "$result" ]]; then
         echo "$result"
@@ -56,9 +56,9 @@ function wt
         echo $result >&2
         return $exit_code
     end
-    # Check if first line is a cd command
+    # Check if first line is a cd or tmux attach command
     set -l first_line $result[1]
-    if string match -q 'cd *' "$first_line"
+    if string match -q 'cd *' "$first_line"; or string match -q 'tmux attach*' "$first_line"
         eval (string join "; " $result)
     else if test -n "$result"
         echo $result

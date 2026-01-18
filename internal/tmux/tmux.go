@@ -1,10 +1,25 @@
 package tmux
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
+
+// runTmux executes a tmux command and returns a descriptive error if it fails
+func runTmux(args ...string) error {
+	cmd := exec.Command("tmux", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		errMsg := strings.TrimSpace(string(output))
+		if errMsg != "" {
+			return fmt.Errorf("%s", errMsg)
+		}
+		return err
+	}
+	return nil
+}
 
 // InTmux returns true if currently running inside a tmux session
 func InTmux() bool {
@@ -33,8 +48,7 @@ func SessionExists(name string) bool {
 
 // CreateSession creates a new detached tmux session
 func CreateSession(name string) error {
-	cmd := exec.Command("tmux", "new-session", "-d", "-s", name)
-	return cmd.Run()
+	return runTmux("new-session", "-d", "-s", name)
 }
 
 // WindowExists checks if a window with the given name exists in the session
@@ -55,23 +69,44 @@ func WindowExists(session, windowName string) bool {
 // SwitchToWindow switches to an existing window in the given session
 func SwitchToWindow(session, windowName string) error {
 	target := session + ":" + windowName
-	cmd := exec.Command("tmux", "select-window", "-t", target)
-	return cmd.Run()
+	return runTmux("select-window", "-t", target)
 }
 
 // CreateWindow creates a new window in the given session
 // If onEnter is provided, it will be executed as the initial command
 func CreateWindow(session, windowName, path, onEnter string) error {
-	args := []string{"new-window", "-t", session, "-n", windowName, "-c", path}
+	// Use "session:" (with trailing colon) to target the session without
+	// specifying a window index. This lets tmux automatically find the next
+	// available index, avoiding "index in use" errors when the index after
+	// the current window is already taken.
+	args := []string{"new-window", "-t", session + ":", "-n", windowName, "-c", path}
 	if onEnter != "" {
 		args = append(args, onEnter)
 	}
-	cmd := exec.Command("tmux", args...)
-	return cmd.Run()
+	return runTmux(args...)
 }
 
 // SwitchClient switches the tmux client to a different session
 func SwitchClient(session string) error {
-	cmd := exec.Command("tmux", "switch-client", "-t", session)
-	return cmd.Run()
+	return runTmux("switch-client", "-t", session)
+}
+
+// CurrentWindow returns the name of the current tmux window
+// Returns empty string if not in tmux or on error
+func CurrentWindow() string {
+	if !InTmux() {
+		return ""
+	}
+	cmd := exec.Command("tmux", "display-message", "-p", "#{window_name}")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// KillWindow kills a window in the given session
+func KillWindow(session, windowName string) error {
+	target := session + ":" + windowName
+	return runTmux("kill-window", "-t", target)
 }

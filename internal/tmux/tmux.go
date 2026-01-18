@@ -75,7 +75,11 @@ func SwitchToWindow(session, windowName string) error {
 // CreateWindow creates a new window in the given session
 // If onEnter is provided, it will be executed as the initial command
 func CreateWindow(session, windowName, path, onEnter string) error {
-	args := []string{"new-window", "-t", session, "-n", windowName, "-c", path}
+	// Use "session:" (with trailing colon) to target the session without
+	// specifying a window index. This lets tmux automatically find the next
+	// available index, avoiding "index in use" errors when the index after
+	// the current window is already taken.
+	args := []string{"new-window", "-t", session + ":", "-n", windowName, "-c", path}
 	if onEnter != "" {
 		args = append(args, onEnter)
 	}

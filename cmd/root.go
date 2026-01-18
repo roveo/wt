@@ -215,6 +215,9 @@ func deleteWorktree(database *sql.DB, wt *db.Worktree) error {
 		}
 	}
 
+	// Clean up tmux window if it exists
+	cleanupTmuxWindow(wt)
+
 	// Soft-delete from database
 	if err := db.SoftDeleteWorktree(database, wt.ID); err != nil {
 		return fmt.Errorf("failed to update database: %w", err)
@@ -332,5 +335,52 @@ func outputCdCommands(path, onEnter string) {
 	fmt.Printf("cd %q\n", path)
 	if onEnter != "" {
 		fmt.Println(onEnter)
+	}
+}
+
+// cleanupTmuxWindow kills the tmux window associated with a worktree if it exists
+func cleanupTmuxWindow(wt *db.Worktree) {
+	// Load global config
+	globalCfg, err := config.Load()
+	if err != nil {
+		return // Silently fail - not critical
+	}
+
+	// Check if tmux mode is enabled
+	if globalCfg.Tmux.Mode != "window" {
+		return // Tmux integration disabled
+	}
+
+	// Determine target session
+	var targetSession string
+	if globalCfg.Tmux.Session != "" {
+		targetSession = globalCfg.Tmux.Session
+	} else if tmux.InTmux() {
+		targetSession = tmux.CurrentSession()
+	} else {
+		return // Not in tmux and no dedicated session configured
+	}
+
+	// Check if session exists
+	if !tmux.SessionExists(targetSession) {
+		return // Session doesn't exist
+	}
+
+	// Build window name
+	windowName := fmt.Sprintf("%s:%s", wt.RepoName, wt.Branch)
+
+	// Check if window exists
+	if !tmux.WindowExists(targetSession, windowName) {
+		return // Window doesn't exist
+	}
+
+	// Warn if currently in the window being killed
+	if tmux.InTmux() && tmux.CurrentWindow() == windowName {
+		fmt.Fprintf(os.Stderr, "Warning: Killing current tmux window '%s'...\n", windowName)
+	}
+
+	// Kill the window
+	if err := tmux.KillWindow(targetSession, windowName); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to kill tmux window '%s': %v\n", windowName, err)
 	}
 }

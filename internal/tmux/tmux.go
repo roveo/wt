@@ -75,3 +75,24 @@ func SwitchClient(session string) error {
 	cmd := exec.Command("tmux", "switch-client", "-t", session)
 	return cmd.Run()
 }
+
+// CurrentWindow returns the name of the current tmux window
+// Returns empty string if not in tmux or on error
+func CurrentWindow() string {
+	if !InTmux() {
+		return ""
+	}
+	cmd := exec.Command("tmux", "display-message", "-p", "#{window_name}")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// KillWindow kills a window in the given session
+func KillWindow(session, windowName string) error {
+	target := session + ":" + windowName
+	cmd := exec.Command("tmux", "kill-window", "-t", target)
+	return cmd.Run()
+}

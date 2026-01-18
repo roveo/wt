@@ -121,6 +121,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to remove worktree: %w (use --force to force removal)", removeErr)
 	}
 
+	// Clean up tmux window if it exists
+	cleanupTmuxWindow(worktree)
+
 	// Soft-delete from database
 	if err := db.SoftDeleteWorktree(database, worktree.ID); err != nil {
 		return fmt.Errorf("failed to update database: %w", err)
